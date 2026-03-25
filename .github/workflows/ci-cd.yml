@@ -1,0 +1,28 @@
+name: CI/CD Pipeline cho San Giao Dich
+
+# Kịch bản này sẽ tự động chạy mỗi khi bạn đẩy code mới lên nhánh 'main'
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest # GitHub sẽ tự cấp 1 máy ảo Ubuntu để chạy
+
+    steps:
+      - name: Lấy code mới nhất về máy ảo
+        uses: actions/checkout@v3
+
+      - name: Đăng nhập vào Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build và đẩy (Push) Image lên mây
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          # Đánh nhãn latest để luôn ghi đè bản mới nhất
+          tags: minhtrimtp789/metal-gold-api:latest
