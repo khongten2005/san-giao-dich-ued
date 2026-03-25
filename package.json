@@ -1,0 +1,10 @@
+{
+  "name": "metal-gold-ticker-backend",
+  "version": "1.0.0",
+  "description": "API tra cuu du lieu thi truong gia lap",
+  "main": "app.js",
+  "dependencies": {
+    "express": "^4.19.2",
+    "axios": "^1.6.2"
+  }
+}
