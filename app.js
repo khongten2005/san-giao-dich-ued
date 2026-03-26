@@ -1,5 +1,5 @@
 const express = require('express');
-const axios = require('axios'); // Gọi thư viện axios để chọc API thật
+const axios = require('axios'); 
 const app = express();
 const port = 3000;
 
@@ -7,14 +7,37 @@ const port = 3000;
 const CONTAINER_NAME = process.env.CONTAINER_NAME || "Backend_Unknown";
 
 // ==========================================
-// 1. API LẤY GIÁ VÀNG THẬT (BACKEND)
+// 1. API LẤY DỮ LIỆU LỊCH SỬ (VẼ BIỂU ĐỒ BÚT TOÁN TOÀN CẢNH)
+// ==========================================
+app.get('/api/history', async (req, res) => {
+    try {
+        // Lấy 48 cây nến gần nhất (mỗi nến 1 giờ = 2 ngày)
+        const response = await axios.get('https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=1h&limit=48');
+        
+        const chartData = response.data.map(candle => {
+            return {
+                time: candle[0] / 1000,   // Đổi timestamp ra giây cho Lightweight Charts
+                open: parseFloat(candle[1]),
+                high: parseFloat(candle[2]),
+                low: parseFloat(candle[3]),
+                close: parseFloat(candle[4])
+            };
+        });
+        
+        console.log(`[${CONTAINER_NAME}] Da gui du lieu lich su (48 nen)`);
+        res.json(chartData);
+    } catch (error) {
+        console.log(`[${CONTAINER_NAME}] Lỗi gọi API History:`, error.message);
+        res.status(500).json({ error: "Không thể lấy dữ liệu lịch sử" });
+    }
+});
+
+// ==========================================
+// 2. API LẤY GIÁ VÀNG THẬT (REAL-TIME GIẬT GIẬT TỪNG GIÂY)
 // ==========================================
 app.get('/api/gold', async (req, res) => {
     try {
-        // Lấy giá PAXG/USDT (Bảo chứng 1:1 với vàng thật) từ Binance
         const response = await axios.get('https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT');
-        
-        // Ép kiểu về số thực và làm tròn 2 chữ số thập phân
         const realPrice = parseFloat(response.data.price).toFixed(2);
 
         const goldPriceData = {
@@ -25,17 +48,15 @@ app.get('/api/gold', async (req, res) => {
             timestamp: new Date().toISOString()
         };
         
-        console.log(`[${CONTAINER_NAME}] Cap nhat gia vang that: $${realPrice}`);
         res.json(goldPriceData);
-
     } catch (error) {
-        console.log(`[${CONTAINER_NAME}] Lỗi gọi API Binance:`, error.message);
+        console.log(`[${CONTAINER_NAME}] Lỗi gọi API Realtime:`, error.message);
         res.status(500).json({ error: "Không thể lấy giá vàng lúc này" });
     }
 });
 
 // ==========================================
-// 2. GIAO DIỆN SÀN GIAO DỊCH (FRONTEND)
+// 3. GIAO DIỆN SÀN GIAO DỊCH VIP (FRONTEND)
 // ==========================================
 app.get('/', (req, res) => {
     res.send(`
@@ -44,7 +65,8 @@ app.get('/', (req, res) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Live Trading Dashboard</title>
+        <title>Live Trading Dashboard VIP</title>
+        <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
         <style>
             body { 
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
@@ -53,8 +75,10 @@ app.get('/', (req, res) => {
                 display: flex; 
                 justify-content: center; 
                 align-items: center; 
-                height: 100vh; 
+                min-height: 100vh; 
                 margin: 0; 
+                padding: 20px;
+                box-sizing: border-box;
             }
             .dashboard { 
                 background: #1e293b; 
@@ -63,7 +87,8 @@ app.get('/', (req, res) => {
                 box-shadow: 0 10px 40px rgba(0,0,0,0.8); 
                 text-align: center; 
                 border: 1px solid #334155; 
-                width: 450px; 
+                width: 100%; 
+                max-width: 900px; /* Mở rộng chiều ngang để chứa biểu đồ */
                 position: relative;
             }
             .live-indicator {
@@ -79,8 +104,14 @@ app.get('/', (req, res) => {
             
             h1 { color: #facc15; margin-top: 0; font-size: 26px; letter-spacing: 1px; }
             .ticker { font-size: 18px; color: #94a3b8; margin-bottom: 20px; }
+            
+            .flex-container {
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+            }
+
             .price-box { 
-                margin: 30px 0; 
                 background: #0f172a; 
                 padding: 20px; 
                 border-radius: 15px; 
@@ -91,6 +122,15 @@ app.get('/', (req, res) => {
             .down { color: #ef4444; } 
             .neutral { color: #e2e8f0; } 
             
+            /* Khu vực chứa biểu đồ */
+            #chart-container {
+                width: 100%;
+                height: 400px;
+                border-radius: 10px;
+                overflow: hidden;
+                border: 1px solid #334155;
+            }
+
             .server-info { 
                 background: #0f172a; 
                 padding: 15px; 
@@ -98,7 +138,6 @@ app.get('/', (req, res) => {
                 font-size: 14px; 
                 color: #94a3b8; 
                 border: 1px dashed #475569;
-                margin-top: 20px;
             }
             .server-info span { 
                 color: #38bdf8; 
@@ -118,38 +157,68 @@ app.get('/', (req, res) => {
     <body>
         <div class="dashboard">
             <div class="live-indicator">● LIVE</div>
-            <h1>📊 SÀN GIAO DỊCH UED</h1>
+            <h1>📊 SÀN GIAO DỊCH UED (PRO VERSION)</h1>
             <div class="ticker">Tỷ giá: <b>VÀNG THẾ GIỚI (XAU/USD)</b></div>
             
-            <div class="price-box">
-                <div class="price neutral" id="priceDisplay">Đang tải...</div>
+            <div class="flex-container">
+                <div class="price-box">
+                    <div class="price neutral" id="priceDisplay">Đang tải...</div>
+                </div>
+
+                <div id="chart-container"></div>
+
+                <div class="server-info">
+                    Đang được xử lý cân bằng tải bởi máy chủ:<br>
+                    <span id="serverName">Đang kết nối...</span>
+                </div>
             </div>
 
-            <div class="server-info">
-                Đang được xử lý cân bằng tải bởi máy chủ:<br>
-                <span id="serverName">Đang kết nối...</span>
-            </div>
-
-            <div class="status-text">🔄 Hệ thống tự động cập nhật mỗi 2 giây</div>
+            <div class="status-text">🔄 Hệ thống cập nhật thời gian thực mỗi 2 giây</div>
         </div>
 
         <script>
-            let previousPrice = null; 
+            // --- CẤU HÌNH BIỂU ĐỒ LIGHTWEIGHT CHARTS ---
+            const chartProperties = {
+                layout: { textColor: '#d1d5db', background: { type: 'solid', color: '#0f172a' } },
+                grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                timeScale: { timeVisible: true, secondsVisible: false },
+            };
+            const chartContainer = document.getElementById('chart-container');
+            const chart = LightweightCharts.createChart(chartContainer, chartProperties);
+            const candleSeries = chart.addCandlestickSeries({
+                upColor: '#10b981', downColor: '#ef4444', 
+                borderDownColor: '#ef4444', borderUpColor: '#10b981', 
+                wickDownColor: '#ef4444', wickUpColor: '#10b981'
+            });
 
-            function fetchData() {
+            let previousPrice = null; 
+            let lastCandle = null; // Lưu lại cây nến cuối cùng để cập nhật Realtime
+
+            // --- BƯỚC 1: TẢI DỮ LIỆU LỊCH SỬ ---
+            function loadHistory() {
+                fetch('/api/history')
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.error) return;
+                        candleSeries.setData(data);
+                        lastCandle = data[data.length - 1]; // Lấy cây nến cuối mảng
+                    })
+                    .catch(err => console.log("Lỗi tải lịch sử:", err));
+            }
+
+            // --- BƯỚC 2: CẬP NHẬT GIÁ REALTIME ---
+            function fetchRealtimeData() {
                 fetch('/api/gold')
                     .then(res => res.json())
                     .then(data => {
-                        if(data.error) {
-                            console.error(data.error);
-                            return; // Bỏ qua nếu lỗi mạng để giao diện không bị sập
-                        }
+                        if(data.error) return;
 
                         const priceElement = document.getElementById('priceDisplay');
                         const serverElement = document.getElementById('serverName');
                         const currentPrice = parseFloat(data.price);
                         
-                        // Thuật toán đổi màu: Chỉ đổi khi giá thay đổi
+                        // Đổi màu số to
                         if (previousPrice !== null && currentPrice !== previousPrice) {
                             if (currentPrice > previousPrice) {
                                 priceElement.className = 'price up';
@@ -159,28 +228,44 @@ app.get('/', (req, res) => {
                                 priceElement.innerHTML = currentPrice.toFixed(2) + ' <span style="font-size:30px">▼</span>';
                             }
                         } else if (previousPrice === null) {
-                            // Lần đầu tải trang
                             priceElement.innerHTML = currentPrice.toFixed(2);
                         }
-                        
                         previousPrice = currentPrice; 
                         
-                        // Hiển thị tên máy chủ đang phục vụ (Load Balancer đang chia việc)
+                        // Cập nhật Server load balancer
                         serverElement.style.color = '#ffffff';
                         serverElement.innerText = "🚀 " + data.server;
                         setTimeout(() => { serverElement.style.color = '#38bdf8'; }, 300);
+
+                        // --- MA THUẬT NẰM Ở ĐÂY: GIẬT CÂY NẾN HIỆN TẠI ---
+                        if (lastCandle) {
+                            // Cập nhật giá đóng cửa (close) bằng giá hiện tại
+                            lastCandle.close = currentPrice;
+                            // Co giãn râu nến (high/low) nếu giá đâm thủng đỉnh/đáy của giờ này
+                            if (currentPrice > lastCandle.high) lastCandle.high = currentPrice;
+                            if (currentPrice < lastCandle.low) lastCandle.low = currentPrice;
+                            
+                            // Ép biểu đồ vẽ lại cây nến cuối
+                            candleSeries.update(lastCandle);
+                        }
                     })
-                    .catch(err => console.log("Lỗi:", err));
+                    .catch(err => console.log("Lỗi tải realtime:", err));
             }
             
-            // Chạy ngay lần đầu
-            fetchData();
-            
-            // Tự động gọi lại mỗi 2 giây (2000ms)
-            setInterval(fetchData, 2000);
+            // Khởi chạy
+            loadHistory();
+            setTimeout(() => {
+                fetchRealtimeData(); // Chạy mồi phát đầu
+                setInterval(fetchRealtimeData, 2000); // Lặp lại mỗi 2s
+            }, 1000); // Đợi 1s cho load xong lịch sử rồi mới chạy realtime
+
+            // Responsive biểu đồ khi đổi size trình duyệt
+            window.addEventListener('resize', () => {
+                chart.applyOptions({ width: chartContainer.clientWidth });
+            });
         </script>
     </body>
-    </html>
+    </html> 
     `);
 });
 
