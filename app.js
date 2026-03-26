@@ -2,6 +2,7 @@ const express = require('express');
 const axios = require('axios'); 
 const app = express();
 const port = 3000;
+app.use(express.static('.'));
 
 const CONTAINER_NAME = process.env.CONTAINER_NAME || "Backend_Unknown";
 
@@ -101,7 +102,9 @@ app.get('/', (req, res) => {
             <div class="live-indicator">● LIVE</div>
             <h1>📊 SIÊU SÀN GIAO DỊCH UED</h1>
             <div id="title-display">Đang giao dịch: <b id="asset-name" style="color:white;">VÀNG (PAXG/USDT)</b></div>
-            
+            <div style="text-align: center; margin-bottom: 20px;">
+    <img src="/1.png" alt="Phong cảnh UED" style="max-width: 100%; height: auto; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+            </div>
             <div class="control-panel">
                 <div class="btn-group" id="symbol-btns">
                     <button class="active" onclick="changeSymbol('PAXGUSDT', 'VÀNG (PAXG/USDT)')">VÀNG</button>
