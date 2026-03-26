@@ -7,7 +7,7 @@ const port = 3000;
 const CONTAINER_NAME = process.env.CONTAINER_NAME || "Backend_Unknown";
 
 // ==========================================
-// 1. API LẤY DỮ LIỆU LỊCH SỬ (VẼ BIỂU ĐỒ BÚT TOÁN TOÀN CẢNH)
+// 1. API LẤY DỮ LIỆU LỊCH SỬ (VẼ BIỂU ĐỒ NẾN TOÀN CẢNH)
 // ==========================================
 app.get('/api/history', async (req, res) => {
     try {
@@ -33,7 +33,7 @@ app.get('/api/history', async (req, res) => {
 });
 
 // ==========================================
-// 2. API LẤY GIÁ VÀNG THẬT (REAL-TIME GIẬT GIẬT TỪNG GIÂY)
+// 2. API LẤY GIÁ VÀNG THẬT (REAL-TIME GIẬT TỪNG GIÂY)
 // ==========================================
 app.get('/api/gold', async (req, res) => {
     try {
@@ -66,7 +66,10 @@ app.get('/', (req, res) => {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Live Trading Dashboard VIP</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/lightweight-charts/4.1.1/lightweight-charts.standalone.production.min.js"></script>        <style>
+        
+        <script src="https://cdn.jsdelivr.net/npm/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+        
+        <style>
             body { 
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
                 background-color: #0b0f19; 
@@ -171,16 +174,18 @@ app.get('/', (req, res) => {
                 </div>
             </div>
 
-            <div class="status-text">🔄 Hệ thống cập nhật thời gian thực mỗi 2 giây</div>
+            <div class="status-text">🔄 Hệ thống tự động cập nhật mỗi 2 giây</div>
         </div>
 
         <script>
+            // Cấu hình giao diện biểu đồ
             const chartProperties = {
                 layout: { textColor: '#d1d5db', background: { type: 'solid', color: '#0f172a' } },
                 grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
                 crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
                 timeScale: { timeVisible: true, secondsVisible: false },
             };
+            
             const chartContainer = document.getElementById('chart-container');
             const chart = LightweightCharts.createChart(chartContainer, chartProperties);
             const candleSeries = chart.addCandlestickSeries({
@@ -192,17 +197,22 @@ app.get('/', (req, res) => {
             let previousPrice = null; 
             let lastCandle = null; 
 
+            // Hàm 1: Gọi API lịch sử để vẽ 200 cây nến ban đầu
             function loadHistory() {
                 fetch('/api/history')
                     .then(res => res.json())
                     .then(data => {
-                        if(data.error) return;
+                        if(data.error) {
+                            console.error("Lỗi data lịch sử:", data.error);
+                            return;
+                        }
                         candleSeries.setData(data);
-                        lastCandle = data[data.length - 1]; 
+                        lastCandle = data[data.length - 1]; // Nhớ cây nến cuối cùng
                     })
-                    .catch(err => console.log("Lỗi tải lịch sử:", err));
+                    .catch(err => console.error("Lỗi mạng khi tải lịch sử:", err));
             }
 
+            // Hàm 2: Gọi API giá hiện tại để giật biểu đồ realtime
             function fetchRealtimeData() {
                 fetch('/api/gold')
                     .then(res => res.json())
@@ -213,6 +223,7 @@ app.get('/', (req, res) => {
                         const serverElement = document.getElementById('serverName');
                         const currentPrice = parseFloat(data.price);
                         
+                        // Xử lý đổi màu giá lớn
                         if (previousPrice !== null && currentPrice !== previousPrice) {
                             if (currentPrice > previousPrice) {
                                 priceElement.className = 'price up';
@@ -226,10 +237,12 @@ app.get('/', (req, res) => {
                         }
                         previousPrice = currentPrice; 
                         
+                        // Hiển thị tên Load Balancer
                         serverElement.style.color = '#ffffff';
                         serverElement.innerText = "🚀 " + data.server;
                         setTimeout(() => { serverElement.style.color = '#38bdf8'; }, 300);
 
+                        // Giật râu nến realtime
                         if (lastCandle) {
                             lastCandle.close = currentPrice;
                             if (currentPrice > lastCandle.high) lastCandle.high = currentPrice;
@@ -237,15 +250,18 @@ app.get('/', (req, res) => {
                             candleSeries.update(lastCandle);
                         }
                     })
-                    .catch(err => console.log("Lỗi tải realtime:", err));
+                    .catch(err => console.error("Lỗi mạng tải realtime:", err));
             }
             
-            loadHistory();
+            // KỊCH BẢN CHẠY:
+            loadHistory(); // 1. Tải nguyên mảng đồi núi trước
+            
             setTimeout(() => {
-                fetchRealtimeData(); 
-                setInterval(fetchRealtimeData, 2000); 
+                fetchRealtimeData(); // 2. Mồi phát đầu tiên cho giá to
+                setInterval(fetchRealtimeData, 2000); // 3. Lặp lại giật nhấp nháy mỗi 2s
             }, 1000); 
 
+            // Cân chỉnh lại kích thước biểu đồ khi thu phóng web
             window.addEventListener('resize', () => {
                 chart.applyOptions({ width: chartContainer.clientWidth });
             });
@@ -255,6 +271,7 @@ app.get('/', (req, res) => {
     `);
 });
 
+// Khởi động Server
 app.listen(port, () => {
     console.log(`API dang chay tai cong ${port}`);
 });
