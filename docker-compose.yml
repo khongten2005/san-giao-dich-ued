@@ -13,21 +13,21 @@ services:
       - web_backend_3
 
   web_backend_1:
-    image: minhtrimtp789/metal-gold-api:v1
+    image: minhtrimtp789/metal-gold-api:latest
     environment:
       CONTAINER_NAME: "May_Chu_So_1"
     networks:
       - app_network
 
   web_backend_2:
-    image: minhtrimtp789/metal-gold-api:v1
+    image: minhtrimtp789/metal-gold-api:latest
     environment:
       CONTAINER_NAME: "May_Chu_So_2"
     networks:
       - app_network
 
   web_backend_3:
-    image: minhtrimtp789/metal-gold-api:v1
+    image: minhtrimtp789/metal-gold-api:latest
     environment:
       CONTAINER_NAME: "May_Chu_So_3"
     networks:
