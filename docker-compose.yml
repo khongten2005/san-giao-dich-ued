@@ -14,6 +14,8 @@ services:
 
   web_backend_1:
     image: minhtrimtp789/metal-gold-api:latest
+    volumes:
+      - .:/usr/src/app
     environment:
       CONTAINER_NAME: "May_Chu_So_1"
     networks:
@@ -21,6 +23,8 @@ services:
 
   web_backend_2:
     image: minhtrimtp789/metal-gold-api:latest
+    volumes:
+      - .:/usr/src/app
     environment:
       CONTAINER_NAME: "May_Chu_So_2"
     networks:
@@ -28,6 +32,8 @@ services:
 
   web_backend_3:
     image: minhtrimtp789/metal-gold-api:latest
+    volumes:
+      - .:/usr/src/app
     environment:
       CONTAINER_NAME: "May_Chu_So_3"
     networks:
