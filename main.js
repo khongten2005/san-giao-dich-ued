@@ -12,7 +12,18 @@ let positions = [];
 let tradeHistory = []; 
 let posIdCounter = 0;
 
-// ================= HỆ THỐNG ĐĂNG NHẬP & THÔNG BÁO =================
+// ================= HỆ THỐNG ĐĂNG NHẬP & DROPDOWN MENU =================
+function toggleDropdown(e) {
+    document.getElementById('userDropdown').classList.toggle('show');
+}
+// Click ra ngoài thì đóng Menu
+window.onclick = function(event) {
+    if (!event.target.closest('.user-profile')) {
+        const dropdown = document.getElementById('userDropdown');
+        if (dropdown && dropdown.classList.contains('show')) dropdown.classList.remove('show');
+    }
+}
+
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
@@ -30,15 +41,21 @@ function showToast(message, type = 'success') {
 function checkAuth() {
     let savedName = localStorage.getItem('ued_username');
     let savedBalance = localStorage.getItem('ued_balance');
+    let savedTime = localStorage.getItem('ued_login_time');
     
     if (savedName) {
         document.getElementById('loginOverlay').style.display = 'none';
         document.getElementById('userProfile').style.display = 'flex';
         document.getElementById('displayUsername').innerText = savedName;
+        
+        // Hiện thời gian đăng nhập
+        let timeDisplay = document.getElementById('loginTimeDisplay');
+        if(timeDisplay) timeDisplay.innerText = savedTime || new Date().toLocaleString('vi-VN');
+
         balance = savedBalance ? parseFloat(savedBalance) : 10000;
         updateBalanceUI();
         showToast(`Chào mừng ${savedName} quay trở lại!`, 'success');
-        reloadAllData(); // Load chart
+        reloadAllData(); 
     }
 }
 
@@ -46,21 +63,23 @@ function handleLogin() {
     let name = document.getElementById('usernameInput').value.trim();
     if(name === '') return alert('Vui lòng nhập tên!');
     localStorage.setItem('ued_username', name);
-    localStorage.setItem('ued_balance', 10000); // Tặng 10k lúc mới vào
+    localStorage.setItem('ued_balance', 10000); 
+    // LƯU THỜI GIAN ĐĂNG NHẬP LÚC BẤM VÀO SÀN
+    localStorage.setItem('ued_login_time', new Date().toLocaleString('vi-VN'));
     checkAuth();
 }
 
 function handleLogout() {
     localStorage.removeItem('ued_username');
     localStorage.removeItem('ued_balance');
-    location.reload(); // Tải lại trang
+    localStorage.removeItem('ued_login_time');
+    location.reload(); 
 }
 
 function updateBalanceUI() {
     document.getElementById('balanceDisplay').innerText = "$" + balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    localStorage.setItem('ued_balance', balance); // Lưu liên tục
+    localStorage.setItem('ued_balance', balance); 
     
-    // Cảnh báo cháy tài khoản
     if(balance < 500 && positions.length > 0) {
         document.getElementById('balanceDisplay').style.color = '#ef4444';
         document.getElementById('balanceDisplay').style.animation = 'blink 1s infinite';
@@ -82,7 +101,7 @@ function resetAccount() {
 }
 // =================================================================
 
-// KHỞI TẠO BIỂU ĐỒ (CÓ VOLUME VÀ ĐƯỜNG MA20)
+// KHỞI TẠO BIỂU ĐỒ
 const chartContainer = document.getElementById('chart-container');
 const chart = LightweightCharts.createChart(chartContainer, {
     layout: { textColor: '#d1d5db', background: { type: 'solid', color: '#0f172a' } },
@@ -91,10 +110,7 @@ const chart = LightweightCharts.createChart(chartContainer, {
 });
 
 const candleSeries = chart.addCandlestickSeries({ upColor: '#10b981', downColor: '#ef4444', borderDownColor: '#ef4444', borderUpColor: '#10b981' });
-
 const volumeSeries = chart.addHistogramSeries({ color: '#26a69a', priceFormat: { type: 'volume' }, priceScaleId: '', scaleMargins: { top: 0.8, bottom: 0 }, });
-
-// Thêm đường MA (Moving Average)
 const maSeries = chart.addLineSeries({ color: '#facc15', lineWidth: 2, title: 'MA 20', crosshairMarkerVisible: false });
 
 function changeSymbol(symbol, name) {
@@ -126,11 +142,9 @@ function reloadAllData() {
             if(data.error) return;
             candleSeries.setData(data);
             
-            // Xử lý Volume
             const volumeData = data.map(candle => ({ time: candle.time, value: Math.random() * 100 + 10, color: candle.close >= candle.open ? '#10b98188' : '#ef444488' }));
             volumeSeries.setData(volumeData);
             
-            // Xử lý đường MA 20
             let maData = [];
             for (let i = 19; i < data.length; i++) {
                 let sum = 0;
@@ -172,7 +186,6 @@ function fetchRealtimeData() {
                 candleSeries.update(lastCandle);
             }
 
-            // CHECK TỰ ĐỘNG CẮT LỖ CHỐT LỜI
             autoCheckSLTP();
             renderPositions();
         });
@@ -226,27 +239,19 @@ function closePosition(id, reason = "Chủ động") {
     
     tradeHistory.push({ ...p, closePrice: globalCurrentPrice, pnl: pnl, closeTime: new Date().toLocaleTimeString(), reason: reason });
     
-    // ==============================================================
-    // BẮN DỮ LIỆU LƯU VÀO DATABASE KHI CHỐT LỆNH
-    // ==============================================================
     let savedName = localStorage.getItem('ued_username') || "Ẩn danh";
     fetch('/api/save-trade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             username: savedName, 
-            asset: p.asset, 
-            type: p.type, 
-            margin: p.margin, 
-            leverage: p.leverage, 
-            entryPrice: p.entryPrice, 
-            closePrice: globalCurrentPrice, 
-            pnl: pnl
+            asset: p.asset, type: p.type, 
+            margin: p.margin, leverage: p.leverage, 
+            entryPrice: p.entryPrice, closePrice: globalCurrentPrice, pnl: pnl
         })
     }).then(res => res.json()).then(data => {
         if(data.success) console.log(`Đã lưu lệnh vào Database qua máy chủ: ${data.server}`);
     }).catch(err => console.error("Lỗi khi lưu DB:", err));
-    // ==============================================================
 
     updateBalanceUI(); renderPositions();
     
@@ -296,4 +301,4 @@ function exportToCSV() {
 }
 
 window.addEventListener('resize', () => chart.applyOptions({ width: document.getElementById('chart-container').clientWidth }));
-checkAuth(); // Khởi động check xem đã đăng nhập chưa
+checkAuth();
