@@ -6,7 +6,9 @@ COPY package*.json ./
 
 RUN npm install --only=production
 
-COPY app.js .
+# ĐÂY LÀ DÒNG ĂN TIỀN NHẤT NÈ! 
+# Lệnh này sẽ hốt sạch sành sanh app.js, index.html, main.js, 1.png vào thùng!
+COPY . .
 
 USER node
 
