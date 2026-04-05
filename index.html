@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siêu Sàn Giao Dịch UED</title>
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b0f19; color: white; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .dashboard { background: #1e293b; padding: 25px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); width: 100%; max-width: 1200px; position: relative; }
+        .live-indicator { position: absolute; top: 20px; right: 20px; color: #ef4444; font-weight: bold; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+        
+        h1 { color: #facc15; text-align: center; margin-top: 0; font-size: 26px; }
+        #title-display { text-align: center; font-size: 16px; color: #94a3b8; margin-bottom: 20px; }
+        
+        .control-panel { display: flex; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; gap: 20px;}
+        .btn-group { display: flex; gap: 10px; }
+        button { background: #334155; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #475569; }
+        button.active { background: #38bdf8; color: #0f172a; }
+
+        .main-layout { display: flex; gap: 20px; align-items: stretch; flex-wrap: wrap; }
+        .left-col { flex: 2; display: flex; flex-direction: column; min-width: 600px;}
+        .right-col { flex: 1; background: #0f172a; padding: 20px; border-radius: 15px; border: 1px solid #334155; display: flex; flex-direction: column; min-width: 300px;}
+
+        .price-box { background: #0f172a; padding: 15px; border-radius: 15px; text-align: center; border: 1px solid #334155;}
+        .price { font-size: 45px; font-weight: bold; transition: 0.3s; }
+        .up { color: #10b981; } .down { color: #ef4444; } .neutral { color: #e2e8f0; } 
+        
+        #chart-container { width: 100%; height: 450px; margin-top: 15px; border-radius: 10px; overflow: hidden; border: 1px solid #334155; }
+        
+        .balance-title { color: #94a3b8; font-size: 14px; text-align: center; }
+        .balance-amount { font-size: 30px; color: #facc15; text-align: center; font-weight: bold; margin-bottom: 20px; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; color: #cbd5e1; font-size: 13px; margin-bottom: 5px; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; background: #1e293b; color: white; border: 1px solid #475569; border-radius: 5px; box-sizing: border-box; font-size: 16px; outline: none; }
+        
+        .action-panel { display: flex; gap: 10px; margin-top: 10px; }
+        .btn-buy { flex: 1; background: #10b981; font-size: 16px; padding: 12px; }
+        .btn-buy:hover { background: #059669; }
+        .btn-sell { flex: 1; background: #ef4444; font-size: 16px; padding: 12px; }
+        .btn-sell:hover { background: #dc2626; }
+
+        .positions-title { margin-top: 25px; border-bottom: 1px solid #334155; padding-bottom: 10px; font-weight: bold; color: #cbd5e1; }
+        .positions-list { flex: 1; overflow-y: auto; margin-top: 10px; max-height: 200px; }
+        .pos-item { background: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px; font-size: 13px; position: relative; border-left: 4px solid gray; }
+        .pos-item.pos-long { border-left-color: #10b981; }
+        .pos-item.pos-short { border-left-color: #ef4444; }
+        .pos-close { position: absolute; top: 10px; right: 10px; background: transparent; border: 1px solid #64748b; padding: 3px 8px; font-size: 11px; cursor: pointer; color: white; border-radius: 4px; }
+        .pos-close:hover { background: #475569; }
+
+        .server-info { margin-top: 20px; text-align: center; font-size: 12px; color: #64748b; width: 100%; }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="live-indicator">● LIVE</div>
+        <h1>📊 SIÊU SÀN GIAO DỊCH UED</h1>
+        
+        <div style="text-align: center; margin-bottom: 20px;">
+            <img src="/1.png" alt="Phong cảnh" style="max-height: 150px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+        </div>
+
+        <div id="title-display">Đang giao dịch: <b id="asset-name" style="color:white;">VÀNG (PAXG/USDT)</b></div>
+        
+        <div class="control-panel">
+            <div class="btn-group" id="symbol-btns">
+                <button class="active" onclick="changeSymbol('PAXGUSDT', 'VÀNG (PAXG/USDT)')">VÀNG</button>
+                <button onclick="changeSymbol('BTCUSDT', 'BITCOIN (BTC/USDT)')">BITCOIN</button>
+                <button onclick="changeSymbol('ETHUSDT', 'ETHEREUM (ETH/USDT)')">ETHEREUM</button>
+            </div>
+            <div class="btn-group" id="interval-btns">
+                <button class="active" onclick="changeInterval('15m')">15 Phút</button>
+                <button onclick="changeInterval('1h')">1 Giờ</button>
+                <button onclick="changeInterval('1d')">1 Ngày</button>
+            </div>
+        </div>
+
+        <div class="main-layout">
+            <div class="left-col">
+                <div class="price-box">
+                    <div class="price neutral" id="priceDisplay">Đang tải...</div>
+                </div>
+                <div id="chart-container"></div>
+            </div>
+
+            <div class="right-col">
+                <div class="balance-title">Tài khoản Demo (USD)</div>
+                <div class="balance-amount" id="balanceDisplay">$10,000.00</div>
+
+                <div class="form-group">
+                    <label>Số tiền cọc (Margin - $):</label>
+                    <input type="number" id="tradeMargin" value="100" min="10" step="10">
+                </div>
+                
+                <div class="form-group">
+                    <label>Đòn bẩy (Leverage):</label>
+                    <select id="tradeLeverage">
+                        <option value="1">1x (Không đòn bẩy)</option>
+                        <option value="10">10x</option>
+                        <option value="50" selected>50x</option>
+                        <option value="100">100x</option>
+                    </select>
+                </div>
+
+                <div class="action-panel">
+                    <button class="btn-buy" onclick="executeTrade('LONG')">▲ MUA (Lên)</button>
+                    <button class="btn-sell" onclick="executeTrade('SHORT')">▼ BÁN (Xuống)</button>
+                </div>
+
+                <div class="positions-title">Lệnh đang chạy</div>
+                <div class="positions-list" id="positionsList">
+                    <div style="text-align:center; color:#64748b; margin-top:20px;">Chưa có lệnh nào</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="server-info">
+            Hệ thống cân bằng tải: <span id="serverName" style="color: #38bdf8;">Đang kết nối...</span> | Cập nhật 2s/lần
+        </div>
+    </div>
+
+    <script src="/main.js"></script>
+</body>
+</html>
