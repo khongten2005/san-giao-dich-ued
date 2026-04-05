@@ -93,3 +93,23 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, () => console.log(`API chay cong ${port}`));
+// ... các code cũ ở trên ...
+
+// API KÉO DỮ LIỆU TỪ MYSQL CHO TRANG ADMIN
+app.get('/api/admin/data', async (req, res) => {
+    try {
+        if (!pool) return res.status(500).json({ error: "Database chưa sẵn sàng" });
+        // Lấy dữ liệu, sắp xếp mới nhất lên đầu
+        const [rows] = await pool.query('SELECT * FROM trade_history ORDER BY id DESC');
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: "Lỗi truy vấn Database" });
+    }
+});
+
+// TRẢ VỀ GIAO DIỆN TRANG ADMIN
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+// app.listen(port, () => console.log(`API chay cong ${port}`));
