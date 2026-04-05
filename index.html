@@ -42,8 +42,12 @@
         .btn-buy:hover { background: #059669; }
         .btn-sell { flex: 1; background: #ef4444; font-size: 16px; padding: 12px; }
         .btn-sell:hover { background: #dc2626; }
+        
+        /* Nút xuất Excel màu tím VIP */
+        .btn-export { background: #8b5cf6; width: 100%; margin-top: 15px; padding: 12px; font-size: 14px; }
+        .btn-export:hover { background: #7c3aed; }
 
-        .positions-title { margin-top: 25px; border-bottom: 1px solid #334155; padding-bottom: 10px; font-weight: bold; color: #cbd5e1; }
+        .positions-title { margin-top: 25px; border-bottom: 1px solid #334155; padding-bottom: 10px; font-weight: bold; color: #cbd5e1; display: flex; justify-content: space-between;}
         .positions-list { flex: 1; overflow-y: auto; margin-top: 10px; max-height: 200px; }
         .pos-item { background: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px; font-size: 13px; position: relative; border-left: 4px solid gray; }
         .pos-item.pos-long { border-left-color: #10b981; }
@@ -60,7 +64,7 @@
         <h1>📊 SIÊU SÀN GIAO DỊCH UED</h1>
         
         <div style="text-align: center; margin-bottom: 20px;">
-            <img src="/1.png" alt="Phong cảnh" style="max-height: 150px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+            <img src="/1.png" alt="Phong cảnh UED" style="max-height: 150px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
         </div>
 
         <div id="title-display">Đang giao dịch: <b id="asset-name" style="color:white;">VÀNG (PAXG/USDT)</b></div>
@@ -110,10 +114,14 @@
                     <button class="btn-sell" onclick="executeTrade('SHORT')">▼ BÁN (Xuống)</button>
                 </div>
 
-                <div class="positions-title">Lệnh đang chạy</div>
+                <div class="positions-title">
+                    <span>Lệnh đang chạy</span>
+                </div>
                 <div class="positions-list" id="positionsList">
                     <div style="text-align:center; color:#64748b; margin-top:20px;">Chưa có lệnh nào</div>
                 </div>
+
+                <button class="btn-export" onclick="exportToCSV()">⬇ Xuất Excel Lịch Sử</button>
             </div>
         </div>
 

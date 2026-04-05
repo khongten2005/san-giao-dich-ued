@@ -1,4 +1,3 @@
-// Các biến hệ thống
 let currentSymbol = 'PAXGUSDT';
 let currentInterval = '15m';
 let currentAssetName = 'VÀNG (PAXG/USDT)';
@@ -8,25 +7,34 @@ let globalCurrentPrice = 0;
 let lastCandle = null; 
 let fetchIntervalId = null; 
 
-// HỆ THỐNG TÀI KHOẢN DEMO
 let balance = 10000; 
 let positions = [];
+let tradeHistory = []; // Mảng lưu lịch sử để lát xuất Excel
 let posIdCounter = 0;
 
 function updateBalanceUI() {
     document.getElementById('balanceDisplay').innerText = "$" + balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
-// Khởi tạo biểu đồ
+// KHỞI TẠO BIỂU ĐỒ (CÓ THÊM VOLUME)
 const chartContainer = document.getElementById('chart-container');
 const chart = LightweightCharts.createChart(chartContainer, {
     layout: { textColor: '#d1d5db', background: { type: 'solid', color: '#0f172a' } },
     grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
     crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
 });
+
 const candleSeries = chart.addCandlestickSeries({
     upColor: '#10b981', downColor: '#ef4444', 
     borderDownColor: '#ef4444', borderUpColor: '#10b981'
+});
+
+// Thêm cột Volume mờ mờ ở dưới đáy
+const volumeSeries = chart.addHistogramSeries({
+    color: '#26a69a',
+    priceFormat: { type: 'volume' },
+    priceScaleId: '', 
+    scaleMargins: { top: 0.8, bottom: 0 }, 
 });
 
 function changeSymbol(symbol, name) {
@@ -54,6 +62,7 @@ function reloadAllData() {
     document.getElementById('priceDisplay').innerHTML = "Đang tải...";
     document.getElementById('priceDisplay').className = "price neutral";
     candleSeries.setData([]); 
+    volumeSeries.setData([]);
     if(fetchIntervalId) clearInterval(fetchIntervalId);
 
     fetch(`/api/history?symbol=${currentSymbol}&interval=${currentInterval}`)
@@ -61,6 +70,15 @@ function reloadAllData() {
         .then(data => {
             if(data.error) return;
             candleSeries.setData(data);
+            
+            // Xử lý data Volume
+            const volumeData = data.map(candle => ({
+                time: candle.time,
+                value: Math.random() * 100 + 10, // Dữ liệu giả lập Volume cho ngầu
+                color: candle.close >= candle.open ? '#10b98188' : '#ef444488'
+            }));
+            volumeSeries.setData(volumeData);
+            
             lastCandle = data[data.length - 1]; 
         });
 
@@ -70,7 +88,6 @@ function reloadAllData() {
     }, 1000);
 }
 
-// Kéo giá Realtime
 function fetchRealtimeData() {
     fetch(`/api/gold?symbol=${currentSymbol}`)
         .then(res => res.json())
@@ -107,25 +124,28 @@ function fetchRealtimeData() {
 }
 
 function executeTrade(type) {
-    if(globalCurrentPrice === 0) return alert("Hệ thống chưa tải xong giá, vui lòng đợi!");
+    if(globalCurrentPrice === 0) return alert("Hệ thống chưa tải xong giá!");
     
     let margin = parseFloat(document.getElementById('tradeMargin').value);
     let leverage = parseInt(document.getElementById('tradeLeverage').value);
 
     if(isNaN(margin) || margin < 10) return alert("Tiền cọc tối thiểu là $10!");
-    if(margin > balance) return alert("Số dư không đủ! Nạp thêm VIP đi đại ca!");
+    if(margin > balance) return alert("Số dư không đủ!");
 
     balance -= margin; 
     updateBalanceUI();
 
-    positions.unshift({
+    let newPos = {
         id: ++posIdCounter,
         type: type, 
         asset: currentAssetName.split(' ')[0], 
         entryPrice: globalCurrentPrice,
         margin: margin,
-        leverage: leverage
-    });
+        leverage: leverage,
+        time: new Date().toLocaleTimeString()
+    };
+    
+    positions.unshift(newPos);
     renderPositions();
 }
 
@@ -139,11 +159,19 @@ function closePosition(id) {
     balance += (p.margin + pnl); 
     positions.splice(idx, 1); 
     
+    // Lưu vào lịch sử để tải Excel
+    tradeHistory.push({
+        ...p,
+        closePrice: globalCurrentPrice,
+        pnl: pnl,
+        closeTime: new Date().toLocaleTimeString()
+    });
+    
     updateBalanceUI();
     renderPositions();
     
     let pnlString = pnl >= 0 ? '+' + pnl.toFixed(2) : pnl.toFixed(2);
-    alert(`[UED BOT] Đóng lệnh ${p.type} ${p.asset} thành công. Lợi nhuận: $${pnlString}`);
+    alert(`[UED BOT] Đóng lệnh ${p.type} thành công. Lợi nhuận: $${pnlString}`);
 }
 
 function calculatePnL(p) {
@@ -176,6 +204,31 @@ function renderPositions() {
             </div>
         `;
     });
+}
+
+// HÀM XUẤT FILE EXCEL (.CSV) SIÊU NGẦU
+function exportToCSV() {
+    if(tradeHistory.length === 0) return alert("Bạn chưa chốt lời/cắt lỗ lệnh nào. Hãy giao dịch trước khi xuất báo cáo!");
+    
+    // Tạo BOM để file Excel không bị lỗi font Tiếng Việt
+    let csvContent = "\uFEFF"; 
+    csvContent += "ID,Thoi Gian Mo,Tai San,Loai Lenh,Tien Coc ($),Don Bay,Gia Vao,Gia Dong,Thoi Gian Dong,Lai/Lo ($)\n";
+    
+    tradeHistory.forEach(h => {
+        let pnlString = h.pnl >= 0 ? `+${h.pnl.toFixed(2)}` : h.pnl.toFixed(2);
+        let row = `${h.id},${h.time},${h.asset},${h.type},${h.margin},${h.leverage}x,${h.entryPrice},${h.closePrice},${h.closeTime},${pnlString}`;
+        csvContent += row + "\n";
+    });
+
+    // Ép trình duyệt tự động tải file xuống
+    let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    let link = document.createElement("a");
+    let url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Bao_Cao_UED_${new Date().getTime()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 // Khởi động
