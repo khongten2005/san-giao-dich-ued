@@ -225,6 +225,29 @@ function closePosition(id, reason = "Chủ động") {
     positions.splice(idx, 1); 
     
     tradeHistory.push({ ...p, closePrice: globalCurrentPrice, pnl: pnl, closeTime: new Date().toLocaleTimeString(), reason: reason });
+    
+    // ==============================================================
+    // BẮN DỮ LIỆU LƯU VÀO DATABASE KHI CHỐT LỆNH
+    // ==============================================================
+    let savedName = localStorage.getItem('ued_username') || "Ẩn danh";
+    fetch('/api/save-trade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            username: savedName, 
+            asset: p.asset, 
+            type: p.type, 
+            margin: p.margin, 
+            leverage: p.leverage, 
+            entryPrice: p.entryPrice, 
+            closePrice: globalCurrentPrice, 
+            pnl: pnl
+        })
+    }).then(res => res.json()).then(data => {
+        if(data.success) console.log(`Đã lưu lệnh vào Database qua máy chủ: ${data.server}`);
+    }).catch(err => console.error("Lỗi khi lưu DB:", err));
+    // ==============================================================
+
     updateBalanceUI(); renderPositions();
     
     let pnlString = pnl >= 0 ? '+' + pnl.toFixed(2) : pnl.toFixed(2);
