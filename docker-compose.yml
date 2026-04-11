@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  load_balancer:
+    build: ./nginx
+    ports:
+      - "80:80"
+    networks:
+      - app_network
+    depends_on:
+      - web_backend_1
+      - web_backend_2
+      - web_backend_3
+
+  web_backend_1:
+    image: minhtrimtp789/metal-gold-api:latest
+    volumes:
+      - .:/usr/src/app
+    environment:
+      CONTAINER_NAME: "Máy_Chủ_Backend_01"
+    networks:
+      - app_network
+
+  web_backend_2:
+    image: minhtrimtp789/metal-gold-api:latest
+    volumes:
+      - .:/usr/src/app
+    environment:
+      CONTAINER_NAME: "Máy_Chủ_Backend_02"
+    networks:
+      - app_network
+
+  web_backend_3:
+    image: minhtrimtp789/metal-gold-api:latest
+    volumes:
+      - .:/usr/src/app
+    environment:
+      CONTAINER_NAME: "Máy_Chủ_Backend_03"
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
