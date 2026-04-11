@@ -29,6 +29,8 @@ services:
     container_name: metal-gold-ticker-web_backend_1
     environment:
       CONTAINER_NAME: "May_Chu_So_1"
+    volumes:
+      - .:/app # Ép nó dùng code và node_modules ngoài VPS của đại ca
     networks:
       - app_network
     depends_on:
@@ -39,6 +41,8 @@ services:
     container_name: metal-gold-ticker-web_backend_2
     environment:
       CONTAINER_NAME: "May_Chu_So_2"
+    volumes:
+      - .:/app
     networks:
       - app_network
     depends_on:
@@ -49,12 +53,13 @@ services:
     container_name: metal-gold-ticker-web_backend_3
     environment:
       CONTAINER_NAME: "May_Chu_So_3"
+    volumes:
+      - .:/app
     networks:
       - app_network
     depends_on:
       - db
 
-  # ĐƯA PHPMYADMIN VÀO ĐÂY NÈ ĐẠI CA (Dưới cấp của services)
   phpmyadmin:
     image: phpmyadmin
     container_name: metal-gold-ticker-phpmyadmin

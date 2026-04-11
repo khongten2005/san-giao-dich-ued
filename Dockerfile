@@ -1,5 +1,5 @@
 # Dùng bản Node.js nhẹ và ổn định
-FROM node:18-alpine
+FROM node:18
 
 # Tạo thư mục làm việc trong container
 WORKDIR /app

@@ -1,21 +1,22 @@
 const express = require('express');
-const path = require('path'); 
-const axios = require('axios'); 
-const mysql = require('mysql2/promise'); 
-const bcrypt = require('bcrypt'); 
-const jwt = require('jsonwebtoken'); 
+const path = require('path');
+const axios = require('axios');
+const mysql = require('mysql2/promise');
+const bcrypt = require('bcryptjs'); // Dùng bcryptjs cho nhẹ và ổn định trên Docker
+const jwt = require('jsonwebtoken');
+
 const app = express();
 const port = 3000;
 
 app.use(express.static(__dirname));
-app.use(express.json()); 
+app.use(express.json());
 
 const CONTAINER_NAME = process.env.CONTAINER_NAME || "Backend_Unknown";
-const SECRET_KEY = "Sieu_Mat_Khau_Cua_Khoa_UED"; 
+const SECRET_KEY = "Sieu_Mat_Khau_Cua_Khoa_UED";
 
 // ================= CẤU HÌNH DATABASE MYSQL =================
 const dbConfig = {
-    host: 'db', 
+    host: 'db',
     user: 'ued_user',
     password: 'ued_password',
     database: 'ued_trading',
@@ -26,10 +27,22 @@ const dbConfig = {
 
 let pool;
 
+// ================= KẾT NỐI DB (CHIÊU RETRY THẦN THÁNH) =================
 async function initDB() {
+    while (true) {
+        try {
+            pool = mysql.createPool(dbConfig);
+            // Kiểm tra kết nối thực tế
+            await pool.query("SELECT 1");
+            console.log(`[${CONTAINER_NAME}] ✅ Kết nối MySQL thành công!`);
+            break; // Thoát vòng lặp khi kết nối OK
+        } catch (err) {
+            console.log(`[${CONTAINER_NAME}] ⏳ MySQL chưa tỉnh, 2 giây nữa Khoa thử lại...`);
+            await new Promise(res => setTimeout(res, 2000));
+        }
+    }
+
     try {
-        pool = mysql.createPool(dbConfig);
-        
         const createTradeTable = `
             CREATE TABLE IF NOT EXISTS trade_history (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -56,21 +69,17 @@ async function initDB() {
             )
         `;
         await pool.query(createUsersTable);
-
-        console.log(`[${CONTAINER_NAME}] Kết nối MySQL thành công! Đã tạo xong bảng Users và Trade History.`);
-    } catch (error) {
-        console.error(`[${CONTAINER_NAME}] Đang chờ MySQL khởi động...`);
+        console.log(`[${CONTAINER_NAME}] ✅ Đã kiểm tra và tạo xong các bảng.`);
+    } catch (dbErr) {
+        console.error("❌ Lỗi tạo bảng:", dbErr);
     }
 }
-initDB();
 
-// ================= CÁC API XÁC THỰC (ĐĂNG KÝ / ĐĂNG NHẬP) =================
-
+// ================= API XÁC THỰC =================
 app.post('/api/register', async (req, res) => {
     try {
         const { username, password } = req.body;
         if (!username || !password) return res.status(400).json({ error: "Nhập đủ thông tin!" });
-        if (!pool) return res.status(500).json({ error: "DB chưa sẵn sàng!" });
 
         const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
         if (rows.length > 0) return res.status(400).json({ error: "Tên đăng nhập đã tồn tại!" });
@@ -78,18 +87,18 @@ app.post('/api/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
         await pool.query('INSERT INTO users (username, password, balance) VALUES (?, ?, ?)', [username, hashedPassword, 10000]);
 
-        res.json({ success: true, message: "Đăng ký thành công! Hãy đăng nhập." });
+        res.json({ success: true, message: "Đăng ký thành công!" });
     } catch (error) {
-        console.error(error); res.status(500).json({ error: "Lỗi máy chủ!" });
+        console.error(error);
+        res.status(500).json({ error: "Lỗi máy chủ!" });
     }
 });
 
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
-        if (!pool) return res.status(500).json({ error: "DB chưa sẵn sàng!" });
-
         const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
+        
         if (rows.length === 0) return res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu!" });
 
         const user = rows[0];
@@ -99,75 +108,84 @@ app.post('/api/login', async (req, res) => {
         const token = jwt.sign({ id: user.id, username: user.username }, SECRET_KEY, { expiresIn: '12h' });
         res.json({ success: true, token, username: user.username, balance: parseFloat(user.balance) });
     } catch (error) {
-        console.error(error); res.status(500).json({ error: "Lỗi máy chủ!" });
+        console.error(error);
+        res.status(500).json({ error: "Lỗi máy chủ!" });
     }
 });
 
-// ================= CÁC API NGHIỆP VỤ (CŨ) =================
-
+// ================= API DỮ LIỆU TỪ BINANCE =================
 app.get('/api/history', async (req, res) => {
     try {
-        const symbol = req.query.symbol || 'PAXGUSDT'; 
-        const interval = req.query.interval || '15m';  
+        const symbol = req.query.symbol || 'PAXGUSDT';
+        const interval = req.query.interval || '15m';
         const response = await axios.get(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=200`);
+        
         const chartData = response.data.map(candle => ({
-            time: candle[0] / 1000, open: parseFloat(candle[1]), high: parseFloat(candle[2]), low: parseFloat(candle[3]), close: parseFloat(candle[4])
+            time: candle[0] / 1000,
+            open: parseFloat(candle[1]),
+            high: parseFloat(candle[2]),
+            low: parseFloat(candle[3]),
+            close: parseFloat(candle[4])
         }));
         res.json(chartData);
-    } catch (error) { res.status(500).json({ error: "Lỗi tải lịch sử" }); }
+    } catch (error) {
+        res.status(500).json({ error: "Lỗi tải lịch sử" });
+    }
 });
 
 app.get('/api/gold', async (req, res) => {
     try {
         const symbol = req.query.symbol || 'PAXGUSDT';
         const response = await axios.get(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
-        res.json({ ticker: symbol, price: parseFloat(response.data.price).toFixed(2), server: CONTAINER_NAME });
-    } catch (error) { res.status(500).json({ error: "Lỗi tải giá" }); }
+        res.json({
+            ticker: symbol,
+            price: parseFloat(response.data.price).toFixed(2),
+            server: CONTAINER_NAME
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Lỗi tải giá" });
+    }
 });
 
+// ================= LƯU LỆNH GIAO DỊCH =================
 app.post('/api/save-trade', async (req, res) => {
     try {
         const { username, asset, type, margin, leverage, entryPrice, closePrice, pnl } = req.body;
-        if (!pool) return res.status(500).json({ error: "Database chưa khởi động xong!" });
-
-        const query = `INSERT INTO trade_history (username, asset, trade_type, margin, leverage, entry_price, close_price, pnl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+        const query = `
+            INSERT INTO trade_history 
+            (username, asset, trade_type, margin, leverage, entry_price, close_price, pnl) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `;
         await pool.query(query, [username, asset, type, margin, leverage, entryPrice, closePrice, pnl]);
-
-        // Cập nhật lại số dư trong bảng Users
         await pool.query(`UPDATE users SET balance = balance + ? WHERE username = ?`, [pnl, username]);
 
         res.json({ success: true, server: CONTAINER_NAME });
     } catch (error) {
-        console.error(error); res.status(500).json({ error: "Lỗi lưu Database" });
+        console.error(error);
+        res.status(500).json({ error: "Lỗi lưu Database" });
     }
 });
 
-app.get('/api/admin/data', async (req, res) => {
+app.get('/api/my-history', async (req, res) => {
     try {
-        if (!pool) return res.status(500).json({ error: "Database chưa sẵn sàng" });
-        const [rows] = await pool.query('SELECT * FROM trade_history ORDER BY id DESC');
+        const username = req.query.username;
+        if (!username) return res.status(400).json({ error: "Thiếu username" });
+        const [rows] = await pool.query("SELECT * FROM trade_history WHERE username = ? ORDER BY closed_at DESC", [username]);
         res.json(rows);
-    } catch (error) { res.status(500).json({ error: "Lỗi truy vấn Database" }); }
-});
-
-app.get('/api/my-history', (req, res) => {
-    const username = req.query.username; // Lấy tên người dùng từ trình duyệt gửi lên
-    
-    if (!username) {
-        return res.status(400).json({ error: "Thiếu tên đăng nhập" });
+    } catch (err) {
+        res.status(500).json({ error: "Lỗi server" });
     }
-
-    const sql = "SELECT * FROM trades WHERE username = ? ORDER BY closed_at DESC";
-    
-    db.query(sql, [username], (err, results) => {
-        if (err) {
-            console.error("Lỗi MySQL: ", err);
-            return res.status(500).json({ error: "Lỗi kết nối Database" });
-        }
-        res.json(results); // Chỉ trả về đúng dữ liệu của thằng này thôi
-    });
 });
+
+// ================= ĐIỀU HƯỚNG GIAO DIỆN =================
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
+app.get('/ls', (req, res) => res.sendFile(path.join(__dirname, 'ls.html')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-app.listen(port, () => console.log(`API chay cong ${port}`));
+// ================= KHỞI ĐỘNG =================
+async function startServer() {
+    await initDB();
+    app.listen(port, () => console.log(`🚀 Sàn UED của đại ca Khoa đang chạy tại cổng ${port}`));
+}
+
+startServer();
