@@ -150,6 +150,23 @@ app.get('/api/admin/data', async (req, res) => {
     } catch (error) { res.status(500).json({ error: "Lỗi truy vấn Database" }); }
 });
 
+app.get('/api/my-history', (req, res) => {
+    const username = req.query.username; // Lấy tên người dùng từ trình duyệt gửi lên
+    
+    if (!username) {
+        return res.status(400).json({ error: "Thiếu tên đăng nhập" });
+    }
+
+    const sql = "SELECT * FROM trades WHERE username = ? ORDER BY closed_at DESC";
+    
+    db.query(sql, [username], (err, results) => {
+        if (err) {
+            console.error("Lỗi MySQL: ", err);
+            return res.status(500).json({ error: "Lỗi kết nối Database" });
+        }
+        res.json(results); // Chỉ trả về đúng dữ liệu của thằng này thôi
+    });
+});
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 

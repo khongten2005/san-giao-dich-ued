@@ -100,6 +100,7 @@ async function handleLogin() {
         if(data.success) {
             localStorage.setItem('ued_token', data.token);
             localStorage.setItem('ued_username', data.username);
+            localStorage.setItem('username', data.username);
             localStorage.setItem('ued_balance', data.balance);
             localStorage.setItem('ued_login_time', new Date().toLocaleString('vi-VN'));
             
@@ -115,6 +116,7 @@ async function handleLogin() {
 
 function handleLogout() {
     localStorage.removeItem('ued_username');
+    localStorage.removeItem('username');
     localStorage.removeItem('ued_balance');
     localStorage.removeItem('ued_login_time');
     localStorage.removeItem('ued_token'); // Nhớ xóa token khi đăng xuất
