@@ -1,0 +1,6 @@
+node_modules/
+.env
+db_data/
+*.log
+1.png
+git
