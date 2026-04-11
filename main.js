@@ -16,7 +16,7 @@ let posIdCounter = 0;
 function toggleDropdown(e) {
     document.getElementById('userDropdown').classList.toggle('show');
 }
-// Click ra ngoài thì đóng Menu
+
 window.onclick = function(event) {
     if (!event.target.closest('.user-profile')) {
         const dropdown = document.getElementById('userDropdown');
@@ -42,13 +42,13 @@ function checkAuth() {
     let savedName = localStorage.getItem('ued_username');
     let savedBalance = localStorage.getItem('ued_balance');
     let savedTime = localStorage.getItem('ued_login_time');
+    let token = localStorage.getItem('ued_token'); // Thêm check token
     
-    if (savedName) {
+    if (savedName && token) {
         document.getElementById('loginOverlay').style.display = 'none';
         document.getElementById('userProfile').style.display = 'flex';
         document.getElementById('displayUsername').innerText = savedName;
         
-        // Hiện thời gian đăng nhập
         let timeDisplay = document.getElementById('loginTimeDisplay');
         if(timeDisplay) timeDisplay.innerText = savedTime || new Date().toLocaleString('vi-VN');
 
@@ -59,20 +59,65 @@ function checkAuth() {
     }
 }
 
-function handleLogin() {
-    let name = document.getElementById('usernameInput').value.trim();
-    if(name === '') return alert('Vui lòng nhập tên!');
-    localStorage.setItem('ued_username', name);
-    localStorage.setItem('ued_balance', 10000); 
-    // LƯU THỜI GIAN ĐĂNG NHẬP LÚC BẤM VÀO SÀN
-    localStorage.setItem('ued_login_time', new Date().toLocaleString('vi-VN'));
-    checkAuth();
+// Gọi API Đăng ký
+async function handleRegister() {
+    let username = document.getElementById('usernameInput').value.trim();
+    let password = document.getElementById('passwordInput').value.trim();
+    if(!username || !password) return showToast('Vui lòng nhập đủ tài khoản & mật khẩu!', 'error');
+
+    try {
+        let res = await fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        let data = await res.json();
+        
+        if(data.success) { 
+            showToast(data.message, 'success'); 
+        } else { 
+            showToast(data.error, 'error'); 
+        }
+    } catch (e) { 
+        showToast("Lỗi mạng, không thể đăng ký!", 'error'); 
+    }
+}
+
+// Gọi API Đăng nhập
+async function handleLogin() {
+    let username = document.getElementById('usernameInput').value.trim();
+    let password = document.getElementById('passwordInput').value.trim();
+    if(!username || !password) return showToast('Vui lòng nhập đủ tài khoản & mật khẩu!', 'error');
+
+    try {
+        let res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        let data = await res.json();
+        
+        if(data.success) {
+            localStorage.setItem('ued_token', data.token);
+            localStorage.setItem('ued_username', data.username);
+            localStorage.setItem('ued_balance', data.balance);
+            localStorage.setItem('ued_login_time', new Date().toLocaleString('vi-VN'));
+            
+            showToast("Đăng nhập thành công!", 'success');
+            checkAuth();
+        } else {
+            showToast(data.error, 'error');
+        }
+    } catch (e) { 
+        showToast("Lỗi mạng, không thể đăng nhập!", 'error'); 
+    }
 }
 
 function handleLogout() {
     localStorage.removeItem('ued_username');
     localStorage.removeItem('ued_balance');
     localStorage.removeItem('ued_login_time');
+    localStorage.removeItem('ued_token'); // Nhớ xóa token khi đăng xuất
     location.reload(); 
 }
 

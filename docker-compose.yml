@@ -12,7 +12,6 @@ services:
       - web_backend_2
       - web_backend_3
 
-  # ĐÂY LÀ CON MYSQL TRÙM CUỐI
   db:
     image: mysql:8.0
     environment:
@@ -26,9 +25,8 @@ services:
       - app_network
 
   web_backend_1:
-    image: minhtrimtp789/metal-gold-api:latest
-    volumes:
-      - .:/usr/src/app
+    build: .
+    container_name: metal-gold-ticker-web_backend_1
     environment:
       CONTAINER_NAME: "May_Chu_So_1"
     networks:
@@ -37,9 +35,8 @@ services:
       - db
 
   web_backend_2:
-    image: minhtrimtp789/metal-gold-api:latest
-    volumes:
-      - .:/usr/src/app
+    build: .
+    container_name: metal-gold-ticker-web_backend_2
     environment:
       CONTAINER_NAME: "May_Chu_So_2"
     networks:
@@ -48,9 +45,8 @@ services:
       - db
 
   web_backend_3:
-    image: minhtrimtp789/metal-gold-api:latest
-    volumes:
-      - .:/usr/src/app
+    build: .
+    container_name: metal-gold-ticker-web_backend_3
     environment:
       CONTAINER_NAME: "May_Chu_So_3"
     networks:
@@ -58,10 +54,24 @@ services:
     depends_on:
       - db
 
+  # ĐƯA PHPMYADMIN VÀO ĐÂY NÈ ĐẠI CA (Dưới cấp của services)
+  phpmyadmin:
+    image: phpmyadmin
+    container_name: metal-gold-ticker-phpmyadmin
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOST=db
+      - PMA_USER=root
+      - PMA_PASSWORD=rootpassword
+    networks:
+      - app_network
+
 networks:
   app_network:
     driver: bridge
 
-# Khởi tạo ổ cứng ảo lưu dữ liệu vĩnh viễn
 volumes:
   db_data:
