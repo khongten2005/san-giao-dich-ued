@@ -12,7 +12,25 @@ let positions = [];
 let tradeHistory = []; 
 let posIdCounter = 0;
 
-// ================= HỆ THỐNG ĐĂNG NHẬP & DROPDOWN MENU =================
+// ================= HỆ THỐNG LƯU TRỮ BỔ SUNG (FIX LỖI F5) =================
+function savePositionsToLocalStorage() {
+    localStorage.setItem('ued_active_positions', JSON.stringify(positions));
+    localStorage.setItem('ued_pos_counter', posIdCounter);
+}
+
+function loadPositionsFromLocalStorage() {
+    const savedPositions = localStorage.getItem('ued_active_positions');
+    const savedCounter = localStorage.getItem('ued_pos_counter');
+    
+    if (savedPositions) {
+        positions = JSON.parse(savedPositions);
+        posIdCounter = savedCounter ? parseInt(savedCounter) : 0;
+        console.log("✅ Đã khôi phục các lệnh đang chạy từ bộ nhớ trình duyệt.");
+        renderPositions();
+    }
+}
+// ========================================================================
+
 function toggleDropdown(e) {
     document.getElementById('userDropdown').classList.toggle('show');
 }
@@ -42,7 +60,7 @@ function checkAuth() {
     let savedName = localStorage.getItem('ued_username');
     let savedBalance = localStorage.getItem('ued_balance');
     let savedTime = localStorage.getItem('ued_login_time');
-    let token = localStorage.getItem('ued_token'); // Thêm check token
+    let token = localStorage.getItem('ued_token'); 
     
     if (savedName && token) {
         document.getElementById('loginOverlay').style.display = 'none';
@@ -55,11 +73,12 @@ function checkAuth() {
         balance = savedBalance ? parseFloat(savedBalance) : 10000;
         updateBalanceUI();
         showToast(`Chào mừng ${savedName} quay trở lại!`, 'success');
+        
+        loadPositionsFromLocalStorage(); // <-- THÊM VÀO ĐÂY ĐỂ TẢI LẠI LỆNH KHI ĐĂNG NHẬP
         reloadAllData(); 
     }
 }
 
-// Gọi API Đăng ký
 async function handleRegister() {
     let username = document.getElementById('usernameInput').value.trim();
     let password = document.getElementById('passwordInput').value.trim();
@@ -83,7 +102,6 @@ async function handleRegister() {
     }
 }
 
-// Gọi API Đăng nhập
 async function handleLogin() {
     let username = document.getElementById('usernameInput').value.trim();
     let password = document.getElementById('passwordInput').value.trim();
@@ -119,7 +137,8 @@ function handleLogout() {
     localStorage.removeItem('username');
     localStorage.removeItem('ued_balance');
     localStorage.removeItem('ued_login_time');
-    localStorage.removeItem('ued_token'); // Nhớ xóa token khi đăng xuất
+    localStorage.removeItem('ued_token');
+    localStorage.removeItem('ued_active_positions'); // Xóa luôn lệnh lưu tạm khi logout
     location.reload(); 
 }
 
@@ -141,14 +160,13 @@ function resetAccount() {
         balance = 10000;
         positions = [];
         tradeHistory = [];
+        localStorage.removeItem('ued_active_positions'); // Reset bộ nhớ tạm
         updateBalanceUI();
         renderPositions();
         showToast("Tài khoản đã được reset về $10,000", 'success');
     }
 }
-// =================================================================
 
-// KHỞI TẠO BIỂU ĐỒ
 const chartContainer = document.getElementById('chart-container');
 const chart = LightweightCharts.createChart(chartContainer, {
     layout: { textColor: '#d1d5db', background: { type: 'solid', color: '#0f172a' } },
@@ -270,6 +288,7 @@ function executeTrade(type) {
         time: new Date().toLocaleTimeString()
     });
     
+    savePositionsToLocalStorage(); // <-- THÊM VÀO ĐÂY ĐỂ LƯU KHI MỞ LỆNH
     showToast(`Đã MỞ lệnh ${type} ${margin}$ đòn bẩy ${leverage}x`, 'success');
     renderPositions();
 }
@@ -283,6 +302,8 @@ function closePosition(id, reason = "Chủ động") {
     
     balance += (p.margin + pnl); 
     positions.splice(idx, 1); 
+    
+    savePositionsToLocalStorage(); // <-- THÊM VÀO ĐÂY ĐỂ CẬP NHẬT KHI ĐÓNG LỆNH
     
     tradeHistory.push({ ...p, closePrice: globalCurrentPrice, pnl: pnl, closeTime: new Date().toLocaleTimeString(), reason: reason });
     
@@ -307,8 +328,19 @@ function closePosition(id, reason = "Chủ động") {
 }
 
 function calculatePnL(p) {
+    // Nếu giá chưa tải xong (bằng 0), trả về 0 luôn cho an toàn
+    if (globalCurrentPrice === 0) return 0;
+
     let priceRatio = (globalCurrentPrice - p.entryPrice) / p.entryPrice;
-    return (p.type === 'LONG' ? priceRatio : -priceRatio) * p.margin * p.leverage;
+    let rawPnL = (p.type === 'LONG' ? priceRatio : -priceRatio) * p.margin * p.leverage;
+
+    // CHIÊU CHỐNG "LỎ": Không bao giờ cho lỗ quá số tiền cọc (Margin)
+    // Nếu lỗ vượt quá tiền cọc, thì coi như cháy túi (PnL = -Margin)
+    if (rawPnL < -p.margin) {
+        return -p.margin;
+    }
+
+    return rawPnL;
 }
 
 function renderPositions() {

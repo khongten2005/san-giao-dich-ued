@@ -176,7 +176,16 @@ app.get('/api/my-history', async (req, res) => {
         res.status(500).json({ error: "Lỗi server" });
     }
 });
-
+app.get('/api/admin/data', async (req, res) => {
+    try {
+        if (!pool) return res.status(500).json({ error: "DB chưa sẵn sàng" });
+        const [rows] = await pool.query('SELECT * FROM trade_history ORDER BY id DESC');
+        res.json(rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Lỗi truy vấn Database" });
+    }
+});
 // ================= ĐIỀU HƯỚNG GIAO DIỆN =================
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/ls', (req, res) => res.sendFile(path.join(__dirname, 'ls.html')));
